@@ -1,0 +1,19 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+tmp/
+*.log
+*.pid
+*.app
+
+# Never commit local Codex runtime data.
+.codex/
+auth.json
+logs_2.sqlite*
+.codex-global-state.json*
+state_*.sqlite*
+
+# Local install artifacts.
+codex-pet-limits-viewer
+com.codex-pet-limits-viewer.plist
