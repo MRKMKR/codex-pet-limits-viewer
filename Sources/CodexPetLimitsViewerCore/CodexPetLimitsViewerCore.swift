@@ -119,22 +119,19 @@ public enum LimitPopoverPlacer {
 public enum PetFrameMapper {
     public static func appKitFrame(from rawFrame: CGRect, screens: [CGRect]) -> CGRect {
         guard !screens.isEmpty else { return rawFrame }
-        if screens.contains(where: { $0.intersects(rawFrame) || $0.contains(rawFrame) }) {
-            return rawFrame
-        }
+        let primaryScreen = screens.first { $0.minY == 0 && $0.minX <= 0 && $0.maxX >= 0 }
+            ?? screens.first { $0.contains(CGPoint(x: 0, y: 0)) }
+            ?? screens[0]
+        let primaryHeight = primaryScreen.height
+        let mapped = CGRect(
+            x: rawFrame.minX,
+            y: primaryHeight - rawFrame.minY - rawFrame.height,
+            width: rawFrame.width,
+            height: rawFrame.height
+        )
 
-        let xMatchedScreens = screens.filter {
-            rawFrame.midX >= $0.minX && rawFrame.midX <= $0.maxX
-        }
-
-        for screen in xMatchedScreens {
-            guard rawFrame.minY < 0 else { continue }
-            let localTopY = rawFrame.minY + screen.height
-            let mappedY = screen.maxY - localTopY - rawFrame.height
-            let mapped = CGRect(x: rawFrame.minX, y: mappedY, width: rawFrame.width, height: rawFrame.height)
-            if screen.intersects(mapped) || screen.contains(mapped) {
-                return mapped
-            }
+        if screens.contains(where: { $0.intersects(mapped) || $0.contains(mapped) }) {
+            return mapped
         }
 
         return rawFrame

@@ -49,11 +49,22 @@ final class CodexPetLimitsViewerCoreTests: XCTestCase {
     func testElectronNegativeYFrameMapsToAppKitScreenFrame() {
         let screen = CGRect(x: -549, y: 982, width: 2560, height: 1440)
         let rawPet = CGRect(x: -469, y: -1348, width: 80, height: 87)
-        let mapped = PetFrameMapper.appKitFrame(from: rawPet, screens: [screen])
+        let primary = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let mapped = PetFrameMapper.appKitFrame(from: rawPet, screens: [primary, screen])
 
         XCTAssertEqual(mapped.origin.x, -469, accuracy: 0.001)
         XCTAssertEqual(mapped.origin.y, 2243, accuracy: 0.001)
         XCTAssertTrue(screen.contains(mapped))
+    }
+
+    func testElectronPositiveYFrameMapsToPrimaryAppKitScreenFrame() {
+        let primary = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let rawPet = CGRect(x: 50, y: 44, width: 76, height: 83)
+        let mapped = PetFrameMapper.appKitFrame(from: rawPet, screens: [primary])
+
+        XCTAssertEqual(mapped.origin.x, 50, accuracy: 0.001)
+        XCTAssertEqual(mapped.origin.y, 855, accuracy: 0.001)
+        XCTAssertTrue(primary.contains(mapped))
     }
 
     func testLimitLineFormatting() {
