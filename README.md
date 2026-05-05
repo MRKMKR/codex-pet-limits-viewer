@@ -6,6 +6,10 @@ It is intentionally quiet: no persistent rings, no dashboard, and no controls on
 
 ![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)
 
+## Preview
+
+![Codex Pet Limits Viewer showing a hover popover beside C-Odin](assets/codex-pet-limits-viewer.jpg)
+
 ## Status
 
 Experimental. This is not an official OpenAI or Codex feature.
