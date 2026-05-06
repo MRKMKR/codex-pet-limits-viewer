@@ -90,4 +90,18 @@ final class CodexPetLimitsViewerCoreTests: XCTestCase {
         XCTAssertEqual(state?.weekly.percentRemaining ?? -1, 0.953, accuracy: 0.001)
         XCTAssertEqual(state?.source, "Live")
     }
+
+    func testWeeklyResetShowsTimeOnlyWhenResetIsToday() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 10, minute: 0))!
+        let laterToday = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 16, minute: 5))!
+        let tomorrow = calendar.date(from: DateComponents(year: 2026, month: 1, day: 2, hour: 16, minute: 20))!
+
+        let todayLabel = ResetLabelFormatter.label(for: laterToday, bucketName: "Week", now: now, calendar: calendar)
+        let tomorrowLabel = ResetLabelFormatter.label(for: tomorrow, bucketName: "Week", now: now, calendar: calendar)
+
+        XCTAssertEqual(todayLabel, "16:05")
+        XCTAssertEqual(tomorrowLabel, "Fri")
+    }
 }

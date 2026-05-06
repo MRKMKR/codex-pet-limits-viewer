@@ -116,6 +116,31 @@ public enum LimitPopoverPlacer {
     }
 }
 
+enum ResetLabelFormatter {
+    static func label(
+        for date: Date,
+        bucketName: String,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        if bucketName == "Week", !calendar.isDate(date, inSameDayAs: now) {
+            let formatter = DateFormatter()
+            formatter.calendar = calendar
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = calendar.timeZone
+            formatter.dateFormat = "EEE"
+            return formatter.string(from: date)
+        }
+
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
 public enum PetFrameMapper {
     public static func appKitFrame(from rawFrame: CGRect, screens: [CGRect]) -> CGRect {
         guard !screens.isEmpty else { return rawFrame }
@@ -188,6 +213,7 @@ public final class PetStateReader {
 
 public final class LimitStateReader {
     private let homeDirectory: URL
+    private let nowProvider: () -> Date
     private let endpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
     private lazy var session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
@@ -196,8 +222,12 @@ public final class LimitStateReader {
         return URLSession(configuration: configuration)
     }()
 
-    public init(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    public init(
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        nowProvider: @escaping () -> Date = Date.init
+    ) {
         self.homeDirectory = homeDirectory
+        self.nowProvider = nowProvider
     }
 
     public func readCurrent(completion: @escaping (LimitState) -> Void) {
@@ -345,7 +375,11 @@ public final class LimitStateReader {
         }
         let remaining = max(0, min(1, (100 - usedPercent) / 100))
         let reset = payload.reset_at.map {
-            Self.shortResetFormatter.string(from: Date(timeIntervalSince1970: $0))
+            ResetLabelFormatter.label(
+                for: Date(timeIntervalSince1970: $0),
+                bucketName: name,
+                now: nowProvider()
+            )
         }
         return LimitBucket(name: name, percentRemaining: remaining, resetText: reset)
     }
@@ -359,13 +393,14 @@ public final class LimitStateReader {
             let haystack = dictionary.map { "\($0.key)=\($0.value)" }
                 .joined(separator: " ")
                 .lowercased()
-            let bucket = bucket(from: dictionary)
+            let fiveHourBucket = bucket(from: dictionary, name: "5h")
+            let weeklyBucket = bucket(from: dictionary, name: "Week")
 
             if fiveHour == nil, haystack.contains("5h") || haystack.contains("5_hour") || haystack.contains("five_hour") {
-                fiveHour = LimitBucket(name: "5h", percentRemaining: bucket.percent, resetText: bucket.reset)
+                fiveHour = LimitBucket(name: "5h", percentRemaining: fiveHourBucket.percent, resetText: fiveHourBucket.reset)
             }
             if weekly == nil, haystack.contains("weekly") || haystack.contains("week") {
-                weekly = LimitBucket(name: "Week", percentRemaining: bucket.percent, resetText: bucket.reset)
+                weekly = LimitBucket(name: "Week", percentRemaining: weeklyBucket.percent, resetText: weeklyBucket.reset)
             }
         }
 
@@ -392,7 +427,7 @@ public final class LimitStateReader {
         return []
     }
 
-    private func bucket(from dictionary: [String: Any]) -> (percent: Double?, reset: String?) {
+    private func bucket(from dictionary: [String: Any], name: String) -> (percent: Double?, reset: String?) {
         let lower = Dictionary(uniqueKeysWithValues: dictionary.map { ($0.key.lowercased(), $0.value) })
         let percent = firstNumber(in: lower, keys: [
             "remaining_percent", "remainingpercent", "percent_remaining", "percentremaining",
@@ -402,7 +437,7 @@ public final class LimitStateReader {
         let computed = percent ?? computedRemainingPercent(from: lower)
         let reset = firstString(in: lower, keys: [
             "reset_at", "resetat", "resets_at", "resetsat", "reset_time", "resettime", "next_reset"
-        ]).flatMap(formatReset)
+        ]).flatMap { formatReset($0, bucketName: name) }
 
         return (computed, reset)
     }
@@ -441,14 +476,14 @@ public final class LimitStateReader {
         return max(0, min(1, normalized))
     }
 
-    private func formatReset(_ raw: String) -> String? {
+    private func formatReset(_ raw: String, bucketName: String) -> String? {
         if let seconds = TimeInterval(raw) {
             let date = Date(timeIntervalSince1970: seconds > 10_000_000_000 ? seconds / 1000 : seconds)
-            return Self.shortResetFormatter.string(from: date)
+            return ResetLabelFormatter.label(for: date, bucketName: bucketName, now: nowProvider())
         }
         let iso = ISO8601DateFormatter()
         if let date = iso.date(from: raw) {
-            return Self.shortResetFormatter.string(from: date)
+            return ResetLabelFormatter.label(for: date, bucketName: bucketName, now: nowProvider())
         }
         return raw.isEmpty ? nil : raw
     }
@@ -535,10 +570,4 @@ public final class LimitStateReader {
         }
         return nil
     }
-
-    private static let shortResetFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
 }
